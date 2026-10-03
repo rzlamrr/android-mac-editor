@@ -82,4 +82,5 @@ dependencies {
     implementation(libs.material)
     implementation(libs.libxposed.service)
     compileOnly(libs.libxposed.api)
+    testImplementation(libs.junit)
 }

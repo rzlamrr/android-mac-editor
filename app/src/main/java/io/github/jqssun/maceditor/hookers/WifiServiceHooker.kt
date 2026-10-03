@@ -9,10 +9,12 @@ import android.net.MacAddress
 import android.util.Log
 import io.github.jqssun.maceditor.BuildConfig
 import io.github.jqssun.maceditor.TAG
+import io.github.jqssun.maceditor.utils.MacUtils
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.SystemServerStartingParam
 import java.lang.reflect.Method
+import java.util.concurrent.atomic.AtomicBoolean
 
 class WifiServiceHooker {
     companion object {
@@ -26,8 +28,12 @@ class WifiServiceHooker {
         // cached WifiNative state
         private var nativeInstance: Any? = null
         private var nativeSetStaMethod: Method? = null
-        private var lastIfaceName: String? = null
+        private var staIface: String? = null
+        private var apIface: String? = null
         private var receiverRegistered = false
+        private val hooksInstalled = AtomicBoolean(false)
+        private val staFired = AtomicBoolean(false)
+        private val apFired = AtomicBoolean(false)
 
         @SuppressLint("PrivateApi")
         fun hook(param: SystemServerStartingParam, module: XposedModule) {
@@ -37,19 +43,39 @@ class WifiServiceHooker {
                     .getDeclaredMethod("loadClassFromLoader", String::class.java, ClassLoader::class.java)
             ).intercept { chain ->
                 val result = chain.proceed()
-                val className = chain.getArg(0) as String
-                if (className == "com.android.server.wifi.WifiService") {
-                    val cl = chain.getArg(1) as ClassLoader
-                    val nativeClass = cl.loadClass("com.android.server.wifi.WifiNative")
-                    val setStaMethod = nativeClass.getDeclaredMethod("setStaMacAddress", String::class.java, MacAddress::class.java)
-                    val setApMethod = nativeClass.getDeclaredMethod("setApMacAddress", String::class.java, MacAddress::class.java)
-                    nativeSetStaMethod = setStaMethod
-                    val hooker = MacAddrHooker()
-                    module.hook(setStaMethod).intercept(hooker)
-                    module.hook(setApMethod).intercept(hooker)
-                    module.log(Log.INFO, TAG, "Hooked WifiNative.setStaMacAddress and setApMacAddress")
+                try {
+                    if (chain.getArg(0) == "com.android.server.wifi.WifiService" &&
+                        hooksInstalled.compareAndSet(false, true)
+                    ) {
+                        _installNativeHooks(chain.getArg(1) as ClassLoader)
+                    }
+                } catch (t: Throwable) {
+                    module.log(Log.ERROR, TAG, "Failed to install Wi-Fi hooks: $t")
                 }
                 result
+            }
+        }
+
+        // each hook is installed independently so one wrong method name cannot break the others
+        private fun _installNativeHooks(cl: ClassLoader) {
+            val nativeClass = cl.loadClass("com.android.server.wifi.WifiNative")
+            _hookSafely("WifiNative.setStaMacAddress") {
+                val method = nativeClass.getDeclaredMethod("setStaMacAddress", String::class.java, MacAddress::class.java)
+                nativeSetStaMethod = method
+                module?.hook(method)?.intercept(StaMacHooker())
+            }
+            _hookSafely("WifiNative.setApMacAddress") {
+                val method = nativeClass.getDeclaredMethod("setApMacAddress", String::class.java, MacAddress::class.java)
+                module?.hook(method)?.intercept(ApMacHooker())
+            }
+        }
+
+        private fun _hookSafely(name: String, block: () -> Unit) {
+            try {
+                block()
+                module?.log(Log.INFO, TAG, "Hooked $name")
+            } catch (t: Throwable) {
+                module?.log(Log.ERROR, TAG, "Failed to hook $name: $t")
             }
         }
 
@@ -78,9 +104,9 @@ class WifiServiceHooker {
         private fun _applyMacDirectly() {
             val native = nativeInstance
             val method = nativeSetStaMethod
-            val iface = lastIfaceName
+            val iface = staIface
             if (native == null || method == null || iface == null) {
-                module?.log(Log.WARN, TAG, "Cannot apply MAC: WifiNative not cached yet")
+                module?.log(Log.WARN, TAG, "Cannot apply MAC: WifiNative/STA interface not cached yet")
                 return
             }
             val prefs = module?.getRemotePreferences(BuildConfig.APPLICATION_ID)
@@ -91,8 +117,8 @@ class WifiServiceHooker {
                 // calls WifiNative.setStaMacAddress which does disconnect() + HAL call
                 method.invoke(native, iface, MacAddress.fromString(mac))
                 module?.log(Log.INFO, TAG, "Directly applied MAC: $mac on $iface")
-            } catch (e: Exception) {
-                module?.log(Log.ERROR, TAG, "Failed to directly apply MAC: $e")
+            } catch (t: Throwable) {
+                module?.log(Log.ERROR, TAG, "Failed to directly apply MAC: $t")
             }
         }
 
@@ -109,30 +135,74 @@ class WifiServiceHooker {
             }
         }
 
-        class MacAddrHooker : XposedInterface.Hooker {
+        class StaMacHooker : XposedInterface.Hooker {
             override fun intercept(chain: XposedInterface.Chain): Any? {
-                val prefs = module?.getRemotePreferences(BuildConfig.APPLICATION_ID)
-                val hookActive = prefs?.getBoolean("hookActive", true) ?: true
+                var replacement: MacAddress? = null
+                try {
+                    val prefs = module?.getRemotePreferences(BuildConfig.APPLICATION_ID)
+                    if (prefs?.getBoolean("hookActive", true) ?: true) {
+                        // cache WifiNative instance and STA iface
+                        nativeInstance = chain.thisObject
+                        staIface = chain.getArg(0) as? String
+                        if (staFired.compareAndSet(false, true)) {
+                            module?.log(Log.INFO, TAG, "setStaMacAddress hook fired on $staIface")
+                        }
+                        _registerApplyReceiver()
 
-                if (!hookActive) return chain.proceed()
+                        // broadcast the system-assigned MAC to the app
+                        (chain.getArg(1) as? MacAddress)?.let { _broadcastDeviceMac(it) }
 
-                // cache WifiNative instance and iface
-                nativeInstance = chain.thisObject
-                lastIfaceName = chain.getArg(0) as? String
-                _registerApplyReceiver()
-
-                // broadcast the system-assigned MAC to the app
-                (chain.getArg(1) as? MacAddress)?.let { _broadcastDeviceMac(it) }
-
-                val customMac = prefs?.getString("customMac", "") ?: ""
-                if (customMac.isNotEmpty()) {
-                    val args = chain.args.toTypedArray()
-                    args[1] = MacAddress.fromString(customMac)
-                    module?.log(Log.INFO, TAG, "Replacing MAC with $customMac on ${chain.getArg(0)}")
-                    return chain.proceed(args)
+                        val customMac = prefs?.getString("customMac", "") ?: ""
+                        if (customMac.isNotEmpty()) {
+                            replacement = MacAddress.fromString(customMac)
+                            module?.log(Log.INFO, TAG, "Replacing MAC with $customMac on $staIface")
+                        }
+                    }
+                } catch (t: Throwable) {
+                    module?.log(Log.ERROR, TAG, "STA hook error: $t")
                 }
-                return chain.proceed()
+                return _proceedWith(chain, replacement)
             }
+        }
+
+        // Soft AP: untouched unless "Override hotspot MAC" is on. Never uses the Wi-Fi client MAC.
+        class ApMacHooker : XposedInterface.Hooker {
+            override fun intercept(chain: XposedInterface.Chain): Any? {
+                var replacement: MacAddress? = null
+                try {
+                    val prefs = module?.getRemotePreferences(BuildConfig.APPLICATION_ID)
+                    if (prefs != null && prefs.getBoolean("hookActive", true) &&
+                        prefs.getBoolean("apOverride", false)
+                    ) {
+                        apIface = chain.getArg(0) as? String
+                        if (apFired.compareAndSet(false, true)) {
+                            module?.log(Log.INFO, TAG, "setApMacAddress hook fired on $apIface")
+                        }
+                        val apMac = prefs.getString("apMac", "") ?: ""
+                        val staMacs = listOf(prefs.getString("customMac", "") ?: "")
+                        when {
+                            MacUtils.validate(apMac) != MacUtils.ValidationResult.VALID ->
+                                module?.log(Log.WARN, TAG, "Hotspot MAC invalid or unset; leaving AP MAC unchanged")
+                            MacUtils.collides(apMac, staMacs) ->
+                                module?.log(Log.WARN, TAG, "Hotspot MAC equals a Wi-Fi MAC; leaving AP MAC unchanged")
+                            else -> {
+                                replacement = MacAddress.fromString(apMac)
+                                module?.log(Log.INFO, TAG, "Replacing AP MAC with $apMac on $apIface")
+                            }
+                        }
+                    }
+                } catch (t: Throwable) {
+                    module?.log(Log.ERROR, TAG, "AP hook error: $t")
+                }
+                return _proceedWith(chain, replacement)
+            }
+        }
+
+        private fun _proceedWith(chain: XposedInterface.Chain, mac: MacAddress?): Any? {
+            if (mac == null) return chain.proceed()
+            val args = chain.args.toTypedArray()
+            args[1] = mac
+            return chain.proceed(args)
         }
     }
 }

@@ -43,6 +43,22 @@ class PrefManager {
             prefs?.edit()?.putString("customMac", mac)?.apply()
         }
 
+        fun isApOverride(): Boolean {
+            return prefs?.getBoolean("apOverride", false) ?: false
+        }
+
+        fun setApOverride(on: Boolean) {
+            prefs?.edit()?.putBoolean("apOverride", on)?.apply()
+        }
+
+        fun getApMac(): String {
+            return prefs?.getString("apMac", "") ?: ""
+        }
+
+        fun setApMac(mac: String) {
+            prefs?.edit()?.putString("apMac", mac)?.apply()
+        }
+
         fun isForceShowMacRandomization(): Boolean {
             return prefs?.getBoolean("forceShowMacRandomization", true) ?: true
         }

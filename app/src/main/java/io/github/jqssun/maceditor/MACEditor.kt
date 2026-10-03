@@ -22,12 +22,12 @@ class MACEditor : XposedModule() {
         super.onSystemServerStarting(param)
         try {
             WifiServiceHooker.hook(param, this)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             log(Log.ERROR, TAG, "ERROR: $e")
         }
         try {
             WifiConfigHooker.hook(param, this)
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             log(Log.ERROR, TAG, "Failed to hook WiFi config resources: $e")
         }
     }

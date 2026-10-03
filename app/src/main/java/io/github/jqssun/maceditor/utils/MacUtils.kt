@@ -27,4 +27,8 @@ object MacUtils {
         if (octets[5].toInt() and 0xFF == 0) octets[5] = 1
         return octets.joinToString(":") { "%02X".format(it.toInt() and 0xFF) }
     }
+
+    /** True if [mac] equals any non-empty entry of [others] (case-insensitive). */
+    fun collides(mac: String, others: Collection<String>): Boolean =
+        mac.isNotEmpty() && others.any { it.equals(mac, ignoreCase = true) }
 }

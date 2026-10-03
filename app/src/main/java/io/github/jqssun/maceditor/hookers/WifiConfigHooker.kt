@@ -7,6 +7,7 @@ import io.github.jqssun.maceditor.TAG
 import io.github.libxposed.api.XposedInterface
 import io.github.libxposed.api.XposedModule
 import io.github.libxposed.api.XposedModuleInterface.SystemServerStartingParam
+import java.util.concurrent.ConcurrentHashMap
 
 class WifiConfigHooker {
     companion object {
@@ -17,6 +18,8 @@ class WifiConfigHooker {
             "config_wifi_p2p_mac_randomization_supported",
             "config_wifi_ap_mac_randomization_supported"
         )
+
+        private val logged = ConcurrentHashMap.newKeySet<String>()
 
         fun hook(param: SystemServerStartingParam, module: XposedModule) {
             this.module = module
@@ -36,7 +39,7 @@ class WifiConfigHooker {
                 try {
                     val name = res.getResourceEntryName(id)
                     if (name in TARGET_KEYS) {
-                        module?.log(Log.INFO, TAG, "Forced $name to true")
+                        if (logged.add(name)) module?.log(Log.INFO, TAG, "Forced $name to true")
                         return true
                     }
                 } catch (_: Resources.NotFoundException) {

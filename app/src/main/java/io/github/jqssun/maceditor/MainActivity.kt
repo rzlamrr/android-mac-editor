@@ -37,6 +37,7 @@ class MainActivity : AppCompatActivity() {
 
         _setupToggles()
         _setupMacCard()
+        _setupHotspotCard()
         binding.footerNote.text = getString(R.string.footer_note, getString(R.string.force_mac_randomization_label))
 
         PrefManager.loadPrefs { runOnUiThread { _refreshAll() } }
@@ -69,6 +70,12 @@ class MainActivity : AppCompatActivity() {
         val saved = PrefManager.getCustomMac()
         if (saved.isNotEmpty() && binding.edittextNewMac.text.isNullOrEmpty()) {
             binding.edittextNewMac.setText(saved)
+        }
+        binding.apOverrideSwitch.isChecked = PrefManager.isApOverride()
+        _setApFieldsEnabled(PrefManager.isApOverride())
+        val apMac = PrefManager.getApMac()
+        if (apMac.isNotEmpty() && binding.edittextApMac.text.isNullOrEmpty()) {
+            binding.edittextApMac.setText(apMac)
         }
         updatingUI = false
     }
@@ -149,9 +156,55 @@ class MainActivity : AppCompatActivity() {
                 MacUtils.ValidationResult.ODD_FIRST_OCTET ->
                     _showError(getString(R.string.error_odd_first_octet))
                 MacUtils.ValidationResult.VALID -> {
+                    if (MacUtils.collides(mac, listOf(PrefManager.getApMac()))) {
+                        _showError(getString(R.string.error_mac_collision))
+                        return@setOnClickListener
+                    }
                     PrefManager.setCustomMac(mac)
                     binding.textviewCurrentMac.text = mac
                     _applyMac()
+                }
+            }
+        }
+    }
+
+    private fun _setApFieldsEnabled(on: Boolean) {
+        binding.edittextApMac.isEnabled = on
+        binding.btnGenerateApMac.isEnabled = on
+        binding.btnSetApMac.isEnabled = on
+    }
+
+    private fun _setupHotspotCard() {
+        val editText = binding.edittextApMac
+        editText.filters = arrayOf(InputFilter.AllCaps(), InputFilter.LengthFilter(17))
+        editText.addTextChangedListener(MacTextWatcher())
+
+        binding.apOverrideSwitch.setOnCheckedChangeListener { _, checked ->
+            _setApFieldsEnabled(checked)
+            if (updatingUI) return@setOnCheckedChangeListener
+            PrefManager.setApOverride(checked)
+        }
+
+        binding.btnGenerateApMac.setOnClickListener {
+            editText.setText(MacUtils.generateRandom())
+        }
+
+        binding.btnSetApMac.setOnClickListener {
+            val mac = editText.text.toString().uppercase()
+            when (MacUtils.validate(mac)) {
+                MacUtils.ValidationResult.BAD_LENGTH ->
+                    _showError(getString(R.string.error_bad_length))
+                MacUtils.ValidationResult.ALL_ZEROS ->
+                    _showError(getString(R.string.error_all_zeros))
+                MacUtils.ValidationResult.ODD_FIRST_OCTET ->
+                    _showError(getString(R.string.error_odd_first_octet))
+                MacUtils.ValidationResult.VALID -> {
+                    if (MacUtils.collides(mac, listOf(PrefManager.getCustomMac()))) {
+                        _showError(getString(R.string.error_mac_collision))
+                        return@setOnClickListener
+                    }
+                    PrefManager.setApMac(mac)
+                    Snackbar.make(binding.root, R.string.ap_mac_saved, Snackbar.LENGTH_LONG).show()
                 }
             }
         }

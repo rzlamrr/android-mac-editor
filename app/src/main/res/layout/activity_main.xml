@@ -219,6 +219,87 @@
                 </LinearLayout>
             </com.google.android.material.card.MaterialCardView>
 
+            <!-- Hotspot MAC Card -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/hotspot_card"
+                style="@style/Widget.Material3.CardView.Outlined"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="16dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:orientation="vertical">
+
+                            <com.google.android.material.textview.MaterialTextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="@string/ap_override_label"
+                                android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                            <com.google.android.material.textview.MaterialTextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="@string/ap_override_desc"
+                                android:textAppearance="?attr/textAppearanceBodySmall" />
+                        </LinearLayout>
+
+                        <com.google.android.material.materialswitch.MaterialSwitch
+                            android:id="@+id/ap_override_switch"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+                    </LinearLayout>
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_gravity="center_horizontal"
+                        android:paddingTop="12dp"
+                        android:text="@string/ap_mac"
+                        android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/edittext_ap_mac"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:digits="abcdefABCDEF1234567890:"
+                        android:gravity="center"
+                        android:inputType="textNoSuggestions"
+                        android:layoutDirection="ltr"
+                        android:maxLength="17"
+                        android:singleLine="true"
+                        android:typeface="monospace" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_generate_ap_mac"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/btn_generate_mac" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btn_set_ap_mac"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="@string/btn_set_ap_mac" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
             <!-- Force Show MAC Randomization Card -->
             <com.google.android.material.card.MaterialCardView
                 android:id="@+id/force_randomization_card"
