@@ -98,7 +98,7 @@ class MainActivity : AppCompatActivity() {
         }
         _updateModeViews()
         binding.apOverrideSwitch.isChecked = PrefManager.isApOverride()
-        _setApFieldsEnabled(PrefManager.isApOverride())
+        _setApFieldsVisible(PrefManager.isApOverride())
         val apMac = PrefManager.getApMac()
         if (apMac.isNotEmpty() && binding.edittextApMac.text.isNullOrEmpty()) {
             binding.edittextApMac.setText(apMac)
@@ -301,10 +301,8 @@ class MainActivity : AppCompatActivity() {
         dialog.show()
     }
 
-    private fun _setApFieldsEnabled(on: Boolean) {
-        binding.edittextApMac.isEnabled = on
-        binding.btnGenerateApMac.isEnabled = on
-        binding.btnSetApMac.isEnabled = on
+    private fun _setApFieldsVisible(on: Boolean) {
+        binding.hotspotFields.visibility = if (on) View.VISIBLE else View.GONE
     }
 
     private fun _setupHotspotCard() {
@@ -313,7 +311,7 @@ class MainActivity : AppCompatActivity() {
         editText.addTextChangedListener(MacTextWatcher())
 
         binding.apOverrideSwitch.setOnCheckedChangeListener { _, checked ->
-            _setApFieldsEnabled(checked)
+            _setApFieldsVisible(checked)
             if (updatingUI) return@setOnCheckedChangeListener
             PrefManager.setApOverride(checked)
         }
