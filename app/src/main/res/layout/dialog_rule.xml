@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:paddingHorizontal="24dp"
+    android:paddingTop="16dp">
+
+    <com.google.android.material.textview.MaterialTextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/rule_ssid"
+        android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+    <com.google.android.material.textfield.TextInputEditText
+        android:id="@+id/edittext_rule_ssid"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:inputType="textNoSuggestions"
+        android:singleLine="true" />
+
+    <com.google.android.material.textview.MaterialTextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:paddingTop="12dp"
+        android:text="@string/rule_mac"
+        android:textAppearance="?attr/textAppearanceTitleMedium" />
+
+    <com.google.android.material.textfield.TextInputEditText
+        android:id="@+id/edittext_rule_mac"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:digits="abcdefABCDEF1234567890:"
+        android:gravity="center"
+        android:inputType="textNoSuggestions"
+        android:layoutDirection="ltr"
+        android:maxLength="17"
+        android:singleLine="true"
+        android:typeface="monospace" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_generate_rule_mac"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/btn_generate_mac" />
+</LinearLayout>

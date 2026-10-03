@@ -14,12 +14,30 @@ A free and open-source module that gives you granular control over the Wi-Fi MAC
 - Android 12+ (tested up to Android 16 QPR2)
 - Rooted devices with LSPosed framework installed
 
+## Options
+
+| Option | What it does | Default |
+| --- | --- | --- |
+| Override randomized MAC | Master switch for every override below | on |
+| Per-SSID rules | On: a MAC is applied only when the network being connected matches an enabled rule (SSID to MAC, add/edit/delete in the app, each with its own switch). Off: the single Standby MAC is applied to every Wi-Fi network | on; an upgrade with a saved global MAC and no rules starts in global mode |
+| Override hotspot MAC | Uses the separate Hotspot MAC for the soft AP, never the Wi-Fi MAC | off |
+| Force enable MAC randomization | Forces the resource booleans below | on |
+
+Defaults in short: the hotspot MAC is never touched, and no Wi-Fi MAC is overridden unless an SSID rule matches. Other networks keep Android's normal MAC. The app refuses a Hotspot MAC equal to a Wi-Fi MAC (a duplicate stops the hotspot from starting).
+
+SSID matching strips the surrounding quotes and is exact and case-sensitive. Hidden/empty SSIDs never match. Non-UTF-8 SSIDs are reported by Android as hex and will not match a text rule. Rules are read on every call, so no reboot is needed after changing them.
+
 ## Implementation
 
-On modern Android, [the Wi-Fi subsystem](https://android.googlesource.com/platform/packages/modules/Wifi/+/refs/heads/main/service/java/com/android/server/wifi/WifiNative.java) is capable of randomizing device MAC address per network or per connection. This module hooks the following system server methods to allow manual MAC assignment when randomization is enabled,
+On modern Android, [the Wi-Fi subsystem](https://android.googlesource.com/platform/packages/modules/Wifi/+/refs/heads/main/service/java/com/android/server/wifi/WifiNative.java) is capable of randomizing device MAC address per network or per connection. This module hooks the following system server methods,
 
-- `WifiVendorHal.setStaMacAddress()`
-- `WifiVendorHal.setApMacAddress()`
+- `WifiNative.setStaMacAddress()`: replaces the client MAC (per rule or global)
+- `WifiNative.setApMacAddress()`: replaces the hotspot MAC only when the hotspot override is on
+- `ClientModeImpl.configureRandomizedMacAddress()` and `setCurrentMacToFactoryMac()`: only record the target SSID for the duration of the call, because `setStaMacAddress()` does not know it (checked against AOSP android15-release: both call it synchronously on the same thread). If the framework skips the call because its MAC already equals the current one, the module sets the rule MAC itself.
+
+"Apply" acts on the Wi-Fi interface only and re-sets the MAC if the currently connected SSID has a matching rule. It runs from a broadcast thread rather than the Wi-Fi handler thread and disconnects Wi-Fi briefly.
+
+Every hook is installed independently and only logs on failure. `logcat -s MACEditor` (or the LSPosed log) shows "hook fired" once per hook as proof it is actually reached.
 
 For better compatibility, the module can also be used to force enable [MAC randomization](https://source.android.com/docs/core/connect/wifi-mac-randomization) by specifying the following resource booleans,
 - `config_wifi_connected_mac_randomization_supported`: support for standard Wi-Fi
@@ -27,6 +45,17 @@ For better compatibility, the module can also be used to force enable [MAC rando
 - `config_wifi_ap_mac_randomization_supported`: support for mobile hotspot
 
 This is useful on devices where the hardware and chipset drivers do support MAC randomization, but the device vendor does not implement proper software support. This can also happen on some alternative Android builds where MAC randomization is not explicitly enabled. 
+
+## Testing
+
+The hooks run inside `system_server` and cannot be exercised in CI. CI only runs the JVM unit tests (MAC validation, SSID rule matching) and builds the release APK. Manual test plan (tested target: Android 15, LSPosed 2.2.0):
+
+1. Add a rule `MySSID` -> `02:11:22:33:44:55`, enable the master switch, reconnect to `MySSID`: the Wi-Fi MAC is the rule MAC.
+2. Connect to a different SSID: the MAC is Android's usual one (unchanged).
+3. Disable the rule and reconnect: unchanged. Reconnect right after a previous connection to the same SSID to cover the "framework skipped" path.
+4. Tap Apply while connected to `MySSID`: MAC re-applied; on another SSID: "No enabled rule matches".
+5. Hotspot with "Override hotspot MAC" off: starts normally with Android's MAC.
+6. Hotspot with it on and a distinct Hotspot MAC: starts and uses that MAC.
 
 ### Note for Qualcomm devices
 

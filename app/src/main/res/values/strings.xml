@@ -28,6 +28,21 @@
     <string name="ap_mac_saved">Hotspot MAC saved. Restart the hotspot to apply.</string>
     <string name="error_mac_collision">Error: this MAC is already used for Wi-Fi or hotspot. They must differ.</string>
 
+    <string name="per_ssid_label">Per-SSID rules</string>
+    <string name="per_ssid_desc">On: only networks with an enabled rule get a custom MAC. Off: one Standby MAC for every network.</string>
+    <string name="rules_title">SSID rules</string>
+    <string name="rules_empty">No rules. Networks keep Android\'s MAC.</string>
+    <string name="btn_add_rule">Add rule</string>
+    <string name="rule_ssid">SSID</string>
+    <string name="rule_mac">MAC</string>
+    <string name="rule_delete">Delete rule</string>
+    <string name="rule_save">Save</string>
+    <string name="error_empty_ssid">Error: SSID must not be empty.</string>
+    <string name="error_duplicate_ssid">Error: a rule for this SSID already exists.</string>
+    <string name="apply_applied">MAC applied to the current network.</string>
+    <string name="apply_no_match">No enabled rule matches the current network, nothing changed.</string>
+    <string name="apply_not_ready">Not ready yet. Toggle Wi-Fi once, then try again.</string>
+
     <string name="mac_set_success">MAC saved. Reconnect Wi-Fi to apply.</string>
     <string name="open_wifi_settings">Open</string>
     <string name="error_bad_length">Error: MAC address must be 48 bits long (e.g. 00:11:22:AA:BB:CC).</string>

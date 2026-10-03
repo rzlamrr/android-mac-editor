@@ -7,6 +7,7 @@ appcompat = "1.6.1"
 constraintlayout = "2.1.4"
 material = "1.12.0"
 junit = "4.13.2"
+org-json = "20240303"
 
 [plugins]
 agp-app = { id = "com.android.application", version.ref = "agp" }
@@ -17,5 +18,6 @@ appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "a
 constraintlayout = { group = "androidx.constraintlayout", name = "constraintlayout", version.ref = "constraintlayout" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
+org-json = { group = "org.json", name = "json", version.ref = "org-json" }
 libxposed-api = { group = "io.github.libxposed", name = "api", version.ref = "xposed-api" }
 libxposed-service = { group = "io.github.libxposed", name = "service", version.ref = "xposed-service" }

@@ -43,6 +43,28 @@ class PrefManager {
             prefs?.edit()?.putString("customMac", mac)?.apply()
         }
 
+        fun isPerSsidMode(): Boolean {
+            val p = prefs ?: return true
+            return SsidRules.resolvePerSsidMode(
+                if (p.contains("perSsidMode")) p.getBoolean("perSsidMode", true) else null,
+                getCustomMac(),
+                p.contains("rulesJson")
+            )
+        }
+
+        fun setPerSsidMode(on: Boolean) {
+            prefs?.edit()?.putBoolean("perSsidMode", on)?.apply()
+        }
+
+        fun getRules(): List<SsidRules.Rule> = SsidRules.fromJson(prefs?.getString("rulesJson", null))
+
+        fun setRules(rules: List<SsidRules.Rule>) {
+            prefs?.edit()?.putString("rulesJson", SsidRules.toJson(rules))?.apply()
+        }
+
+        /** MACs the Wi-Fi client can be given in the current mode. */
+        fun wifiMacs(): List<String> = SsidRules.wifiMacs(isPerSsidMode(), getCustomMac(), getRules())
+
         fun isApOverride(): Boolean {
             return prefs?.getBoolean("apOverride", false) ?: false
         }

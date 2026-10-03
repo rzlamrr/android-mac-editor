@@ -7,15 +7,20 @@ import android.content.IntentFilter
 import android.os.Bundle
 import android.provider.Settings
 import android.text.InputFilter
+import android.view.View
+import android.widget.EditText
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.snackbar.Snackbar
 import io.github.jqssun.maceditor.databinding.ActivityMainBinding
+import io.github.jqssun.maceditor.databinding.DialogRuleBinding
+import io.github.jqssun.maceditor.databinding.ItemRuleBinding
 import io.github.jqssun.maceditor.hookers.WifiServiceHooker
 import io.github.jqssun.maceditor.utils.MacTextWatcher
 import io.github.jqssun.maceditor.utils.MacUtils
 import io.github.jqssun.maceditor.utils.PrefManager
+import io.github.jqssun.maceditor.utils.SsidRules
 import io.github.jqssun.maceditor.utils.XposedChecker
 
 class MainActivity : AppCompatActivity() {
@@ -29,6 +34,18 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
+    private val applyResultReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val msg = when (intent.getStringExtra(WifiServiceHooker.EXTRA_RESULT)) {
+                WifiServiceHooker.RESULT_APPLIED -> R.string.apply_applied
+                WifiServiceHooker.RESULT_NO_MATCH -> R.string.apply_no_match
+                WifiServiceHooker.RESULT_NOT_READY -> R.string.apply_not_ready
+                else -> return
+            }
+            Snackbar.make(binding.root, msg, Snackbar.LENGTH_LONG).show()
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -37,6 +54,7 @@ class MainActivity : AppCompatActivity() {
 
         _setupToggles()
         _setupMacCard()
+        _setupRulesCard()
         _setupHotspotCard()
         binding.footerNote.text = getString(R.string.footer_note, getString(R.string.force_mac_randomization_label))
 
@@ -52,12 +70,19 @@ class MainActivity : AppCompatActivity() {
             IntentFilter(MacBroadcastReceiver.ACTION_MAC_DETECTED),
             ContextCompat.RECEIVER_NOT_EXPORTED
         )
+        ContextCompat.registerReceiver(
+            this,
+            applyResultReceiver,
+            IntentFilter(WifiServiceHooker.ACTION_APPLY_RESULT),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
         _refreshAll()
     }
 
     override fun onPause() {
         super.onPause()
         unregisterReceiver(macReceiver)
+        unregisterReceiver(applyResultReceiver)
     }
 
     private fun _refreshAll() {
@@ -71,6 +96,8 @@ class MainActivity : AppCompatActivity() {
         if (saved.isNotEmpty() && binding.edittextNewMac.text.isNullOrEmpty()) {
             binding.edittextNewMac.setText(saved)
         }
+        binding.perSsidSwitch.isChecked = PrefManager.isPerSsidMode()
+        _updateModeViews()
         binding.apOverrideSwitch.isChecked = PrefManager.isApOverride()
         _setApFieldsEnabled(PrefManager.isApOverride())
         val apMac = PrefManager.getApMac()
@@ -133,8 +160,9 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun _refreshActiveMac() {
-        val saved = PrefManager.getCustomMac()
-        binding.textviewCurrentMac.text = saved.ifEmpty { getString(R.string.mac_not_set) }
+        val active = getSharedPreferences(MacBroadcastReceiver.PREFS_NAME, MODE_PRIVATE)
+            .getString("activeMac", null)
+        binding.textviewCurrentMac.text = active ?: getString(R.string.mac_not_set)
     }
 
     private fun _setupMacCard() {
@@ -147,6 +175,11 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnSetMac.setOnClickListener {
+            if (PrefManager.isPerSsidMode()) {
+                // rules are saved as edited; just re-apply to the connected network
+                sendBroadcast(Intent(WifiServiceHooker.ACTION_APPLY_MAC))
+                return@setOnClickListener
+            }
             val mac = editText.text.toString().uppercase()
             when (MacUtils.validate(mac)) {
                 MacUtils.ValidationResult.BAD_LENGTH ->
@@ -161,11 +194,94 @@ class MainActivity : AppCompatActivity() {
                         return@setOnClickListener
                     }
                     PrefManager.setCustomMac(mac)
-                    binding.textviewCurrentMac.text = mac
                     _applyMac()
                 }
             }
         }
+    }
+
+    private fun _updateModeViews() {
+        val perSsid = binding.perSsidSwitch.isChecked
+        binding.standbyGroup.visibility = if (perSsid) View.GONE else View.VISIBLE
+        binding.rulesCard.visibility = if (perSsid) View.VISIBLE else View.GONE
+        if (perSsid) _renderRules()
+    }
+
+    private fun _setupRulesCard() {
+        binding.perSsidSwitch.setOnCheckedChangeListener { _, checked ->
+            if (updatingUI) return@setOnCheckedChangeListener
+            PrefManager.setPerSsidMode(checked)
+            _updateModeViews()
+        }
+        binding.btnAddRule.setOnClickListener { _showRuleDialog(null) }
+    }
+
+    private fun _renderRules() {
+        val rules = PrefManager.getRules()
+        binding.rulesEmpty.visibility = if (rules.isEmpty()) View.VISIBLE else View.GONE
+        binding.rulesContainer.removeAllViews()
+        rules.forEachIndexed { index, rule ->
+            val row = ItemRuleBinding.inflate(layoutInflater, binding.rulesContainer, false)
+            row.ruleSsid.text = rule.ssid
+            row.ruleMac.text = rule.mac
+            row.ruleEnabled.isChecked = rule.enabled
+            row.ruleEnabled.setOnCheckedChangeListener { _, checked ->
+                PrefManager.setRules(PrefManager.getRules().toMutableList().also { it[index] = rule.copy(enabled = checked) })
+            }
+            row.root.setOnClickListener { _showRuleDialog(index) }
+            row.ruleDelete.setOnClickListener {
+                PrefManager.setRules(PrefManager.getRules().filterIndexed { i, _ -> i != index })
+                _renderRules()
+            }
+            binding.rulesContainer.addView(row.root)
+        }
+    }
+
+    private fun _showRuleDialog(index: Int?) {
+        val rules = PrefManager.getRules()
+        val existing = index?.let { rules.getOrNull(it) }
+        val dialogBinding = DialogRuleBinding.inflate(layoutInflater)
+        val macEdit: EditText = dialogBinding.edittextRuleMac
+        macEdit.filters = arrayOf(InputFilter.AllCaps(), InputFilter.LengthFilter(17))
+        macEdit.addTextChangedListener(MacTextWatcher())
+        existing?.let {
+            dialogBinding.edittextRuleSsid.setText(it.ssid)
+            macEdit.setText(it.mac)
+        }
+        dialogBinding.btnGenerateRuleMac.setOnClickListener { macEdit.setText(MacUtils.generateRandom()) }
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setView(dialogBinding.root)
+            .setPositiveButton(R.string.rule_save, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.setOnShowListener {
+            // set here so validation errors keep the dialog open
+            dialog.getButton(android.content.DialogInterface.BUTTON_POSITIVE).setOnClickListener {
+                val ssid = SsidRules.normalizeSsid(dialogBinding.edittextRuleSsid.text.toString())
+                val mac = macEdit.text.toString().uppercase()
+                val error = when {
+                    ssid.isEmpty() -> R.string.error_empty_ssid
+                    rules.withIndex().any { (i, r) -> i != index && r.ssid == ssid } -> R.string.error_duplicate_ssid
+                    MacUtils.validate(mac) == MacUtils.ValidationResult.BAD_LENGTH -> R.string.error_bad_length
+                    MacUtils.validate(mac) == MacUtils.ValidationResult.ALL_ZEROS -> R.string.error_all_zeros
+                    MacUtils.validate(mac) == MacUtils.ValidationResult.ODD_FIRST_OCTET -> R.string.error_odd_first_octet
+                    MacUtils.collides(mac, listOf(PrefManager.getApMac())) -> R.string.error_mac_collision
+                    else -> null
+                }
+                if (error != null) {
+                    _showError(getString(error))
+                    return@setOnClickListener
+                }
+                val rule = SsidRules.Rule(ssid, mac, existing?.enabled ?: true)
+                PrefManager.setRules(if (index != null && existing != null) {
+                    rules.toMutableList().also { it[index] = rule }
+                } else rules + rule)
+                _renderRules()
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
     }
 
     private fun _setApFieldsEnabled(on: Boolean) {
@@ -199,7 +315,7 @@ class MainActivity : AppCompatActivity() {
                 MacUtils.ValidationResult.ODD_FIRST_OCTET ->
                     _showError(getString(R.string.error_odd_first_octet))
                 MacUtils.ValidationResult.VALID -> {
-                    if (MacUtils.collides(mac, listOf(PrefManager.getCustomMac()))) {
+                    if (MacUtils.collides(mac, PrefManager.wifiMacs())) {
                         _showError(getString(R.string.error_mac_collision))
                         return@setOnClickListener
                     }
