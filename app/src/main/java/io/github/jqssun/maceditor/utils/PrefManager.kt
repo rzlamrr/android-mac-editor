@@ -5,6 +5,8 @@ import io.github.jqssun.maceditor.BuildConfig
 import io.github.libxposed.service.XposedService
 import io.github.libxposed.service.XposedServiceHelper
 
+enum class OverrideMode { OFF, GLOBAL, PER_SSID }
+
 class PrefManager {
     companion object {
         private var prefs: SharedPreferences? = null
@@ -64,6 +66,18 @@ class PrefManager {
 
         /** MACs the Wi-Fi client can be given in the current mode. */
         fun wifiMacs(): List<String> = SsidRules.wifiMacs(isPerSsidMode(), getCustomMac(), getRules())
+
+        fun getMode(): OverrideMode = when {
+            !isHookOn() -> OverrideMode.OFF
+            isPerSsidMode() -> OverrideMode.PER_SSID
+            else -> OverrideMode.GLOBAL
+        }
+
+        /** OFF only clears hookActive, so the last Global/Per-SSID choice survives. */
+        fun setMode(mode: OverrideMode) {
+            setHookState(mode != OverrideMode.OFF)
+            if (mode != OverrideMode.OFF) setPerSsidMode(mode == OverrideMode.PER_SSID)
+        }
 
         fun isApOverride(): Boolean {
             return prefs?.getBoolean("apOverride", false) ?: false

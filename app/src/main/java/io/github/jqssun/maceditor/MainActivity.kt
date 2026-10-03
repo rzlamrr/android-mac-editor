@@ -19,6 +19,7 @@ import io.github.jqssun.maceditor.databinding.ItemRuleBinding
 import io.github.jqssun.maceditor.hookers.WifiServiceHooker
 import io.github.jqssun.maceditor.utils.MacTextWatcher
 import io.github.jqssun.maceditor.utils.MacUtils
+import io.github.jqssun.maceditor.utils.OverrideMode
 import io.github.jqssun.maceditor.utils.PrefManager
 import io.github.jqssun.maceditor.utils.SsidRules
 import io.github.jqssun.maceditor.utils.XposedChecker
@@ -90,13 +91,11 @@ class MainActivity : AppCompatActivity() {
         _updateStatusCard()
         _refreshDeviceMac()
         _refreshActiveMac()
-        binding.hookSwitch.isChecked = PrefManager.isHookOn()
         binding.forceRandomizationSwitch.isChecked = PrefManager.isForceShowMacRandomization()
         val saved = PrefManager.getCustomMac()
         if (saved.isNotEmpty() && binding.edittextNewMac.text.isNullOrEmpty()) {
             binding.edittextNewMac.setText(saved)
         }
-        binding.perSsidSwitch.isChecked = PrefManager.isPerSsidMode()
         _updateModeViews()
         binding.apOverrideSwitch.isChecked = PrefManager.isApOverride()
         _setApFieldsEnabled(PrefManager.isApOverride())
@@ -142,9 +141,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun _setupToggles() {
-        binding.hookSwitch.setOnCheckedChangeListener { _, checked ->
-            if (updatingUI) return@setOnCheckedChangeListener
-            PrefManager.setHookState(checked)
+        binding.modeGroup.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked || updatingUI) return@addOnButtonCheckedListener
+            PrefManager.setMode(
+                when (checkedId) {
+                    R.id.btn_mode_global -> OverrideMode.GLOBAL
+                    R.id.btn_mode_per_ssid -> OverrideMode.PER_SSID
+                    else -> OverrideMode.OFF
+                }
+            )
+            _updateModeViews()
             _updateStatusCard()
         }
         binding.forceRandomizationSwitch.setOnCheckedChangeListener { _, checked ->
@@ -175,11 +181,6 @@ class MainActivity : AppCompatActivity() {
         }
 
         binding.btnSetMac.setOnClickListener {
-            if (PrefManager.isPerSsidMode()) {
-                // rules are saved as edited; just re-apply to the connected network
-                sendBroadcast(Intent(WifiServiceHooker.ACTION_APPLY_MAC))
-                return@setOnClickListener
-            }
             val mac = editText.text.toString().uppercase()
             when (MacUtils.validate(mac)) {
                 MacUtils.ValidationResult.BAD_LENGTH ->
@@ -201,19 +202,34 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun _updateModeViews() {
-        val perSsid = binding.perSsidSwitch.isChecked
-        binding.standbyGroup.visibility = if (perSsid) View.GONE else View.VISIBLE
-        binding.rulesCard.visibility = if (perSsid) View.VISIBLE else View.GONE
-        if (perSsid) _renderRules()
+        val mode = PrefManager.getMode()
+        val prev = updatingUI
+        updatingUI = true
+        binding.modeGroup.check(
+            when (mode) {
+                OverrideMode.OFF -> R.id.btn_mode_off
+                OverrideMode.GLOBAL -> R.id.btn_mode_global
+                OverrideMode.PER_SSID -> R.id.btn_mode_per_ssid
+            }
+        )
+        updatingUI = prev
+        binding.globalCard.visibility = if (mode == OverrideMode.GLOBAL) View.VISIBLE else View.GONE
+        binding.rulesCard.visibility = if (mode == OverrideMode.PER_SSID) View.VISIBLE else View.GONE
+        binding.modeHint.setText(
+            when (mode) {
+                OverrideMode.OFF -> R.string.mode_hint_off
+                OverrideMode.GLOBAL -> R.string.mode_hint_global
+                OverrideMode.PER_SSID -> R.string.mode_hint_per_ssid
+            }
+        )
+        if (mode == OverrideMode.PER_SSID) _renderRules()
     }
 
     private fun _setupRulesCard() {
-        binding.perSsidSwitch.setOnCheckedChangeListener { _, checked ->
-            if (updatingUI) return@setOnCheckedChangeListener
-            PrefManager.setPerSsidMode(checked)
-            _updateModeViews()
-        }
         binding.btnAddRule.setOnClickListener { _showRuleDialog(null) }
+        binding.btnApplyRules.setOnClickListener {
+            sendBroadcast(Intent(WifiServiceHooker.ACTION_APPLY_MAC))
+        }
     }
 
     private fun _renderRules() {
@@ -278,6 +294,7 @@ class MainActivity : AppCompatActivity() {
                     rules.toMutableList().also { it[index] = rule }
                 } else rules + rule)
                 _renderRules()
+                Snackbar.make(binding.root, R.string.rule_saved, Snackbar.LENGTH_LONG).show()
                 dialog.dismiss()
             }
         }

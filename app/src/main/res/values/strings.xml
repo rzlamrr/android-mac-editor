@@ -6,12 +6,7 @@
     <string name="status_not_activated">Module Disabled</string>
     <string name="status_inactive">Module Inactive</string>
     <string name="status_detail_not_activated">Preferences cannot load until module is enabled after a reboot.</string>
-    <string name="status_detail_inactive">Ensure system is enabled in scope, then apply MAC address override to activate the module.</string>
-    <string name="status_detail_hook_on">Override enabled: custom MAC in use</string>
-    <string name="status_detail_hook_off">Override disabled: default MAC in use</string>
 
-    <string name="hook_toggle_label">Override randomized MAC</string>
-    <string name="hook_toggle_desc">\"Use randomized MAC\" must be selected in \"Privacy\" under \"Network details\" in Settings</string>
     <string name="force_mac_randomization_label">Force enable MAC randomization</string>
     <string name="force_mac_randomization_desc">Force support for randomization and show \"Privacy\" section in \"Network details\"</string>
     <string name="device_mac">System MAC</string>
@@ -19,17 +14,13 @@
     <string name="new_mac">Standby MAC</string>
     <string name="mac_not_set">Unknown</string>
     <string name="btn_generate_mac">Generate Random MAC</string>
-    <string name="btn_set_mac">Apply MAC Address</string>
 
     <string name="ap_override_label">Override hotspot MAC</string>
-    <string name="ap_override_desc">Off by default. When on, the hotspot uses the MAC below instead of Android\'s. It must differ from your Wi-Fi MAC.</string>
     <string name="ap_mac">Hotspot MAC</string>
     <string name="btn_set_ap_mac">Save Hotspot MAC</string>
     <string name="ap_mac_saved">Hotspot MAC saved. Restart the hotspot to apply.</string>
     <string name="error_mac_collision">Error: this MAC is already used for Wi-Fi or hotspot. They must differ.</string>
 
-    <string name="per_ssid_label">Per-SSID rules</string>
-    <string name="per_ssid_desc">On: only networks with an enabled rule get a custom MAC. Off: one Standby MAC for every network.</string>
     <string name="rules_title">SSID rules</string>
     <string name="rules_empty">No rules. Networks keep Android\'s MAC.</string>
     <string name="btn_add_rule">Add rule</string>
@@ -42,6 +33,22 @@
     <string name="apply_applied">MAC applied to the current network.</string>
     <string name="apply_no_match">No enabled rule matches the current network, nothing changed.</string>
     <string name="apply_not_ready">Not ready yet. Toggle Wi-Fi once, then try again.</string>
+
+    <string name="status_detail_inactive">Toggle Wi-Fi once so the module can hook the system. Rules apply on connect.</string>
+    <string name="status_detail_hook_on">Override on: custom MAC in use</string>
+    <string name="status_detail_hook_off">Override off: default MAC in use</string>
+    <string name="hook_toggle_desc">\"Use randomized MAC\" must be selected in \"Privacy\" under \"Network details\" in Settings</string>
+    <string name="mode_label">Wi-Fi override mode</string>
+    <string name="mode_off">Off</string>
+    <string name="mode_global">Global override</string>
+    <string name="mode_per_ssid">Per-SSID override</string>
+    <string name="mode_hint_off">Override is off. Android\'s MAC is used for every network; rules are ignored.</string>
+    <string name="mode_hint_global">One Standby MAC is used for every Wi-Fi network.</string>
+    <string name="mode_hint_per_ssid">Only networks with an enabled rule get a custom MAC; others keep Android\'s MAC.</string>
+    <string name="btn_set_mac">Apply MAC Address</string>
+    <string name="btn_apply_current">Apply to current network</string>
+    <string name="rule_saved">Rule saved. Applies on next connect. Tap Apply to re-apply now.</string>
+    <string name="ap_override_desc">Off by default. When on, the hotspot uses the MAC below instead of Android\'s. It must differ from your Wi-Fi MAC. Independent of the Wi-Fi override mode.</string>
 
     <string name="mac_set_success">MAC saved. Reconnect Wi-Fi to apply.</string>
     <string name="open_wifi_settings">Open</string>

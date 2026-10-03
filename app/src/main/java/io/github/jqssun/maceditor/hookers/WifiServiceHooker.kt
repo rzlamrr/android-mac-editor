@@ -302,19 +302,18 @@ class WifiServiceHooker {
                 var replacement: MacAddress? = null
                 try {
                     val prefs = module?.getRemotePreferences(BuildConfig.APPLICATION_ID)
-                    if (prefs != null && prefs.getBoolean("hookActive", true) &&
-                        prefs.getBoolean("apOverride", false)
-                    ) {
+                    // independent of the Wi-Fi override mode: only the hotspot switch decides
+                    if (prefs != null && prefs.getBoolean("apOverride", false)) {
                         apIface = chain.getArg(0) as? String
                         if (apFired.compareAndSet(false, true)) {
                             module?.log(Log.INFO, TAG, "setApMacAddress hook fired on $apIface")
                         }
                         val apMac = prefs.getString("apMac", "") ?: ""
-                        val staMacs = SsidRules.wifiMacs(
+                        val staMacs = if (prefs.getBoolean("hookActive", true)) SsidRules.wifiMacs(
                             _isPerSsid(prefs),
                             prefs.getString("customMac", "") ?: "",
                             SsidRules.fromJson(prefs.getString("rulesJson", null))
-                        )
+                        ) else emptyList()
                         when {
                             MacUtils.validate(apMac) != MacUtils.ValidationResult.VALID ->
                                 module?.log(Log.WARN, TAG, "Hotspot MAC invalid or unset; leaving AP MAC unchanged")

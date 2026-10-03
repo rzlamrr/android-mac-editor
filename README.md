@@ -18,10 +18,13 @@ A free and open-source module that gives you granular control over the Wi-Fi MAC
 
 | Option | What it does | Default |
 | --- | --- | --- |
-| Override randomized MAC | Master switch for every override below | on |
-| Per-SSID rules | On: a MAC is applied only when the network being connected matches an enabled rule (SSID to MAC, add/edit/delete in the app, each with its own switch). Off: the single Standby MAC is applied to every Wi-Fi network | on; an upgrade with a saved global MAC and no rules starts in global mode |
-| Override hotspot MAC | Uses the separate Hotspot MAC for the soft AP, never the Wi-Fi MAC | off |
+| Wi-Fi override mode: Off | No Wi-Fi MAC is overridden | |
+| Wi-Fi override mode: Global override | One Standby MAC is applied to every Wi-Fi network | an upgrade with a saved global MAC and no rules starts here |
+| Wi-Fi override mode: Per-SSID override | A MAC is applied only when the network being connected matches an enabled rule (SSID to MAC, add/edit/delete in the app, each with its own switch) | on for new installs |
+| Override hotspot MAC | Uses the separate Hotspot MAC for the soft AP, never the Wi-Fi MAC. Independent of the Wi-Fi mode | off |
 | Force enable MAC randomization | Forces the resource booleans below | on |
+
+The status card (System MAC, Active MAC) is always shown. "Apply MAC Address" (Global) and "Apply to current network" (Per-SSID) re-apply immediately; rules themselves are saved as you edit them and take effect on the next connection.
 
 Defaults in short: the hotspot MAC is never touched, and no Wi-Fi MAC is overridden unless an SSID rule matches. Other networks keep Android's normal MAC. The app refuses a Hotspot MAC equal to a Wi-Fi MAC (a duplicate stops the hotspot from starting).
 
